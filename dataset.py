@@ -17,7 +17,7 @@ class HandDigitDataset(Dataset):
         self.samples = []
 
         # check the exsistence of the root path.
-        if not os.path.isdir(self.root_dir):
+        if not os.path.exists(self.root_dir):
             raise FileNotFoundError(f"The dataset path do not exsit: {self.root_dir}")
 
         # label 0-9 -> the 10 Traditional Chinese
@@ -54,9 +54,11 @@ class HandDigitDataset(Dataset):
 
 if __name__ == '__main__':
     # define data transformation
-    # 1. transform the image into Torch.Tensor
-    # 2. normalization
+    # 1. resize the image into target resolution.
+    # 2. transform the image into Torch.Tensor
+    # 3. normalization
     transform = transforms.Compose([
+        transforms.Resize((32, 32)),
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
     ])
