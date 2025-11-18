@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms
 import time
 import os
@@ -16,14 +16,16 @@ import numpy as np
 # Training parameters
 EPOCHS = 80
 BATCH_SIZE = 64
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 
 # Data paths
 TRAIN_DATA_DIR = './data/train'
 MODEL_SAVE_PATH = 'saved_model_weights.pth'
+FINAL_MODEL_PATH = 'best_weights.pth'
+CHECKPOINT_DIR = 'checkpoints'
 
 # Dataset split
-VALIDATION_SPLIT = 0.10
+VALIDATION_SPLIT = 0.20
 SEED = 42
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,29 +46,47 @@ def set_seed(seed):
 def train_model():
     """Main function to train the model."""
     set_seed(SEED)
+
+    if not os.path.exists(CHECKPOINT_DIR):
+        os.makedirs(CHECKPOINT_DIR)
+        print(f"Created checkpoint directory: {CHECKPOINT_DIR}")
+
     # Define image transformations
-    transform = transforms.Compose([
+    train_transform = transforms.Compose([
         transforms.Resize((32, 32)),
-        # data augment
         transforms.RandomRotation(10),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ToTensor(),
         transforms.Normalize((0.8435,), (0.2694,))
     ])
 
-    # Create the full dataset
+    # valset transformation
+    val_transform = transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.8435,), (0.2694,))
+    ])
+
+
     try:
-        full_dataset = HandDigitDataset(root_dir=TRAIN_DATA_DIR, transform=transform)
-        print(f"Successfully loaded dataset. Total samples: {len(full_dataset)}")
+        dataset_for_train = HandDigitDataset(root_dir=TRAIN_DATA_DIR, transform=train_transform)
+        dataset_for_val = HandDigitDataset(root_dir=TRAIN_DATA_DIR, transform=val_transform)
+        print(f"Successfully loaded dataset. Total samples: {len(dataset_for_train)}")
     except FileNotFoundError as e:
         print(f"Error: {e}")
-        print(f"Please make sure the '{TRAIN_DATA_DIR}' directory exists and is populated.")
         return
 
-    # Split dataset into training and validation sets
-    val_size = int(len(full_dataset) * VALIDATION_SPLIT)
-    train_size = len(full_dataset) - val_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    dataset_size = len(dataset_for_train)
+    indices = list(range(dataset_size))
+    split = int(np.floor(VALIDATION_SPLIT * dataset_size))
+    
+    np.random.shuffle(indices)
+    
+    # split index
+    train_indices, val_indices = indices[split:], indices[:split]
+
+    train_dataset = Subset(dataset_for_train, train_indices)
+    val_dataset = Subset(dataset_for_val, val_indices)
 
     print(f"Training set size: {len(train_dataset)}")
     print(f"Validation set size: {len(val_dataset)}")
@@ -79,6 +99,9 @@ def train_model():
     model = SimpleCNN().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    best_val_accuracy = 0.0
+    best_epoch = 0
     
     start_time = time.time()
     
@@ -133,13 +156,26 @@ def train_model():
               f"Val Loss: {avg_val_loss:.4f} | "
               f"Val Accuracy: {val_accuracy:.2f}%")
 
+        epoch_save_path = os.path.join(CHECKPOINT_DIR, f'model_epoch_{epoch+1}.pth')
+        torch.save(model.state_dict(), epoch_save_path)
+
+        if val_accuracy > best_val_accuracy:
+            best_val_accuracy = val_accuracy
+            best_epoch = epoch + 1
+            best_model_path = os.path.join(CHECKPOINT_DIR, 'best_model.pth')
+            torch.save(model.state_dict(), best_model_path)
+            print(f" -> New Best Model! Saved to {best_model_path}")
+
     end_time = time.time()
     training_duration = end_time - start_time
     print("\n--- Finished Training ---")
     print(f"Total training time: {training_duration / 60:.2f} minutes")
+    print(f"Best Validation Accuracy: {best_val_accuracy:.2f}% at Epoch {best_epoch}")
 
-    torch.save(model.state_dict(), MODEL_SAVE_PATH)
-    print(f"Model weights saved to {MODEL_SAVE_PATH}")
+    print(f"Loading best model from epoch {best_epoch}...")
+    best_model_state = torch.load(os.path.join(CHECKPOINT_DIR, 'best_model.pth'))
+    torch.save(best_model_state, FINAL_MODEL_PATH)
+    print(f"Final best model weights saved to root: {FINAL_MODEL_PATH}")
 
 
 if __name__ == '__main__':
