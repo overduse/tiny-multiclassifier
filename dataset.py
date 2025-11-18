@@ -60,7 +60,7 @@ if __name__ == '__main__':
     transform = transforms.Compose([
         transforms.Resize((32, 32)),
         transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
+        transforms.Normalize((0.8435,), (0.2694,))
     ])
 
     train_dataset_path = './data/train'

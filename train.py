@@ -6,34 +6,52 @@ from torchvision import transforms
 import time
 import os
 
-# Import your custom classes
 from dataset import HandDigitDataset
 from model import SimpleCNN
 
+import random
+import numpy as np
+
+
 # Training parameters
-EPOCHS = 20  # Number of times to iterate over the entire dataset
-BATCH_SIZE = 64 # Number of samples per batch
-LEARNING_RATE = 0.001 # Optimizer's learning rate
+EPOCHS = 80
+BATCH_SIZE = 64
+LEARNING_RATE = 0.001
 
 # Data paths
-TRAIN_DATA_DIR = './data/train' # Directory for the training images
-MODEL_SAVE_PATH = 'saved_model_weights.pth' # Path to save the trained model weights
+TRAIN_DATA_DIR = './data/train'
+MODEL_SAVE_PATH = 'saved_model_weights.pth'
 
 # Dataset split
-VALIDATION_SPLIT = 0.1 # Percentage of training data to use for validation (e.g., 10%)
+VALIDATION_SPLIT = 0.10
+SEED = 42
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 
+def set_seed(seed):
+    """set all random seed to ensure the train process can be reproduced."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
 def train_model():
     """Main function to train the model."""
-    
+    set_seed(SEED)
     # Define image transformations
     transform = transforms.Compose([
         transforms.Resize((32, 32)),
-        transforms.ToTensor(), # Convert PIL Image to PyTorch Tensor
-        transforms.Normalize((0.5,), (0.5,)) # Normalize pixel values to be between -1 and 1
+        # data augment
+        transforms.RandomRotation(10),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.8435,), (0.2694,))
     ])
 
     # Create the full dataset
@@ -57,21 +75,15 @@ def train_model():
     train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False)
     
-    # --- 4. Initialize Model, Loss Function, and Optimizer ---
+    # Initialize Model, Loss Function, and Optimizer
     model = SimpleCNN().to(device)
-    
-    # Loss function: CrossEntropyLoss is suitable for multi-class classification
     criterion = nn.CrossEntropyLoss()
-    
-    # Optimizer: Adam is a good default choice
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
-    # --- 5. Training and Validation Loop ---
     start_time = time.time()
     
     print("\n--- Starting Training ---")
     for epoch in range(EPOCHS):
-        # --- Training Phase ---
         model.train() # Set model to training mode
         running_loss = 0.0
         
@@ -95,7 +107,7 @@ def train_model():
 
         avg_train_loss = running_loss / len(train_loader)
 
-        # --- Validation Phase ---
+        # Validation
         model.eval() # Set model to evaluation mode
         val_loss = 0.0
         correct = 0
@@ -126,8 +138,6 @@ def train_model():
     print("\n--- Finished Training ---")
     print(f"Total training time: {training_duration / 60:.2f} minutes")
 
-    # --- 6. Save the Model ---
-    # We save the model's 'state_dict' which contains the learned weights and biases.
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     print(f"Model weights saved to {MODEL_SAVE_PATH}")
 
