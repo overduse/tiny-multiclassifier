@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, random_split, Subset
 from torchvision import transforms
 
 import time
+import os
 
 from dataset import HandDigitDataset
 from model import SimpleCNN
