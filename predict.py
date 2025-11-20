@@ -4,9 +4,9 @@ from PIL import Image
 import os
 
 # import your model
-from model import SimpleCNN
+from model import SimpleCNN, BNCNN
 
-MODEL_WEIGHTS_PATH = './saved_model_weights.pth'
+MODEL_WEIGHTS_PATH = './checkpoints/best_model.pth'
 
 MEAN_VAL = 0.8435
 STD_VAL = 0.2694
@@ -19,7 +19,8 @@ DATA_TRANSFORM = transforms.Compose([
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = SimpleCNN().to(device)
+model = BNCNN().to(device)
+# model = SimpleCNN().to(device)
 
 try:
     map_location=device
@@ -71,9 +72,9 @@ def predict(img_path: str) -> int:
 if __name__ == '__main__':
     # Testing Block
 
-    # TEST_IMAGE_PATH = './data/train/3/1155109903-IMG_3_2_1155109903.png'
+    TEST_IMAGE_PATH = './data/train/3/1155109903-IMG_3_2_1155109903.png'
     # TEST_IMAGE_PATH = './data/train/7/1155255463-IMG_7_4_1155255463.png'
-    TEST_IMAGE_PATH = './data/train/10/1155252314-IMG_10_8_1155252314.png'
+    # TEST_IMAGE_PATH = './data/train/10/1155252314-IMG_10_8_1155252314.png'
 
     print(f"Running prediction for a single test image: {TEST_IMAGE_PATH}")
 
